@@ -5,7 +5,7 @@
 # ENGINEER    : waveclaw
 # PROGRAM     : repostiory
 # FILE        : HOWTO-Create_a_Debian_Repository
-# CREATED     : 04-APR-2010 waveclaw
+# CREATED     : 04-APR-2010
 # DESCRIPTION : Builds a "Standard" Debian Repository per 
 #	http://www.debian.org/doc/manuals/repository-howto/repository-howto
 # ASSUMPTIONS : Familiarity with bash 
@@ -109,8 +109,8 @@ for release in `echo stable testing unstable`;do  {
 cat << EO_RELEASE >> "${dir}/Release"
 Archive: ${release}
 Component: ${component}
-Origin: Waveclaw.net Packaging Team
-Label: Waveclaw.net Debian repository
+Origin: example.net Packaging Team
+Label: example.net Debian repository
 Architecture: ${arch}
 EO_RELEASE
 # signing not used at this time
@@ -124,8 +124,8 @@ EO_RELEASE
 cat << EO_SRC_RELEASE >> "${dir}/Release"
 Archive: ${release}
 Component: ${component}
-Origin: Waveclaw.net Packaging Team
-Label: Waveclaw.net Debian repository
+Origin: example.net Packaging Team
+Label: example.net Debian repository
 Architecture: source
 EO_SRC_RELEASE
 # signing not used at this time
