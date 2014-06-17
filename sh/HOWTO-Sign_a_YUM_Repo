@@ -114,11 +114,14 @@ cp $PUBLIC_KEY ${NEW_INSTALL_SOURCE}/gpg-pubkey.asc
 
 echo '3. Sign the YUM files'
 
-YUMREPO=${NEW_INSTALL_SOURCE}/RPMS/repodata
-if [ -f ${YUMREPO}/repomd.xml ]
-then 
-  pushd $YUMREPO
-  gpg $GPG_OPTS -detach-sign -u "$TEAM" -a repomd.xml
-  popd
-fi
-cp  $PUBLIC_KEY ${YUMREPO}/repomd.xml.key
+for ARCH in $ARCHES
+do
+ YUMREPO=${NEW_INSTALL_SOURCE}/RPMS/${ARCH}/repodata
+ if [ -f ${YUMREPO}/repomd.xml ]
+ then 
+   pushd $YUMREPO
+   gpg $GPG_OPTS -detach-sign -u "$TEAM" -a repomd.xml
+   popd
+ fi
+ cp  $PUBLIC_KEY ${YUMREPO}/repomd.xml.key
+done
