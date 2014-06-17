@@ -1,0 +1,51 @@
+#!/bin/bash
+############################################################################
+# TITLE       : Repo Tools
+# PROJECT     : Spacewalk
+# ENGINEER    : waveclaw
+# PROGRAM     : mount_repos
+# FILE        : iso2repo 
+# CREATED     : 10-JUN-2013 waveclaw
+# DESCRIPTION : Bash Shell script to mount ISO files
+# ASSUMPTIONS : Familiarity with bash 2.0
+############################################################################
+#                          RELEASE LISCENSE              
+#
+#       This file is available under copyright 2012. 
+#       For internal use only, keep out of young children. 
+#                                                                        
+#       Other Copyrights to their respective owners.                           
+#                                                                        
+#  Current version : 0.1
+#  Latest version  : 0.1
+#  Bugs, Comments  : waveclaw@waveclaw.net
+############################################################################
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+if [ ! -x `which createrepo` ]
+then
+  echo 'No createrepo in path'
+  exit 1
+fi
+
+ROOT=/var/www/html/pub
+echo "assuming disks are already mounted under $ROOT..."
+[ -d $ROOT/ISOs ] || exit 0
+
+rm -rf /tmp/cr_cache.$$ 
+mkdir -p /tmp/cr_cache.$$ 
+
+for DISK in $ROOT/ISOs/*
+do 
+SRC=`basename ${DISK%.iso}`
+MNT=$ROOT/repo/$SRC
+REPO=$ROOT/yum/$SRC
+rm -rf $REPO 
+mkdir -p $REPO 
+pushd $REPO 
+find $MNT -type f -name '*.rpm' -exec ln -sf '{}' . \; && echo "Create a yum repo in $REPO" && createrepo -d -c /tmp/cr_cache.$$ $REPO
+find $MNT -type f -name '*.deb' -exec ln -sf '{}' . \; && echo "Create a Debian Pool in $REPO"
+popd 
+done
+
+rm -rf /tmp/cr_cache.$$ 

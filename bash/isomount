@@ -1,0 +1,52 @@
+#!/bin/bash
+############################################################################
+# TITLE       : Repo Tools
+# PROJECT     : Spacewalk
+# ENGINEER    : waveclaw
+# PROGRAM     : mount_repos
+# FILE        : mountrepos
+# CREATED     : 14-JUN-2013 waveclaw
+# DESCRIPTION : Bash Shell script to mount ISO files
+# ASSUMPTIONS : Familiarity with bash 2.0
+############################################################################
+#                          RELEASE LISCENSE              
+#
+#       This file is available under copyright 2012. 
+#       For internal use only, keep out of young children. 
+#                                                                        
+#       Other Copyrights to their respective owners.                           
+#                                                                        
+#  Current version : 0.1
+#  Latest version  : 0.1
+#  Bugs, Comments  : waveclaw@waveclaw.net
+############################################################################
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+ROOT=/var/www/html/pub
+if [ -d $ROOT/ISOs ]
+then
+  ;
+else
+  echo "No such directory ${ROOT}/ISOs"
+  exit 1
+fi
+
+echo "Use udev to increase the loop devices to 64"
+for ((i=8;i<64;i++)); do   [ -e /dev/loop$i ] || mknod -m 0600 /dev/loop$i b 7 $i; done
+
+echo "Mounting all ISOs in ${ROOT}/ISOs"
+for DISK in $ROOT/ISOs/*.iso
+do 
+ISO=`basename ${DISK%.iso}`
+MNT=$ROOT/repo/$ISO
+umount $DISK >/dev/null 2>&1
+rm -rf $MNT 
+mkdir -p $MNT 
+mount -o loop,ro $DISK $MNT
+if [ 0 -eq $? ]
+then
+echo "Mounted $ISO at $MNT"
+else
+echo "Failed to mount $ISO"
+fi
+done

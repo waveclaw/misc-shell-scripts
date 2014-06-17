@@ -1,0 +1,144 @@
+#!/bin/sh
+############################################################################
+# TITLE       : Debian Pool Tool
+# PROJECT     : repositories 
+# ENGINEER    : waveclaw
+# PROGRAM     : repostiory
+# FILE        : HOWTO-Create_a_Debian_Repository
+# CREATED     : 04-APR-2010 waveclaw
+# DESCRIPTION : Builds a "Standard" Debian Repository per 
+#	http://www.debian.org/doc/manuals/repository-howto/repository-howto
+# ASSUMPTIONS : Familiarity with bash 
+############################################################################
+#                          RELEASE LISCENSE              
+#
+#       This file is available under copyright 2014. 
+#       For internal use only, keep out of young children. 
+#                                                                        
+#       Other Copyrights to their respective owners.                           
+#                                                                        
+#  Current version : 0.1
+#  Latest version  : 0.1
+#  Bugs, Comments  : waveclaw@waveclaw.net
+############################################################################
+#                          RELEVANT DOCUMENTS
+#                           (REFERENCES)
+#
+#  Name                            Comment
+#  ------------------------------- -------------------------------------
+#  Shellfiles in a Nutshell         primary Shell File resource          
+#  unix.stackexchange.com           rsync filter syntax
+#  parchive.sourceforge.net         Parity Archive Tool
+# 
+############################################################################
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# This script is setup to populate packages into 'testing'
+# With some minor changes to the logic it can support other releases, too.
+repo_name=debian_standard_repository
+deb_release=testing # no practical way to detect this at runtime
+
+root=/home/admin/packages
+deb_pool="$root/pool"
+# there are 11 of these in a full debian repo
+supported_archs="i386 x86_64" 
+
+#repo signing is not used at this time
+# KEYRING="$root/gpg-keyring-foo-bar.keyring"  
+
+echo Step 0: Clean out any cruft
+if [ -d $repo_name ] ; then rm -rf $repo_name ;fi
+
+echo Step 1: Create the Standard Debian Repository layout
+echo "$repo_name"
+echo '|'
+echo '+-dists'
+for release in `echo stable testing unstable`;do  {
+  echo "  |-$release"
+  for component in `echo main contrib non-free`;do  {
+   echo "  | |-$component"
+   for arch in `echo $supported_archs`;do  {
+     echo "  | | |-binary-$arch";
+     mkdir -p "$repo_name/dists/$release/$component/binary-$arch"
+    } ; done
+     echo "  | | +-source"
+     mkdir -p "$repo_name/dists/$release/$component/source"
+   } ; done 
+  echo "  |"
+} ; done
+
+
+echo "Step 2: Copy all your .deb files to their proper places."
+# note how this section assume we only have .debs and .dsc for the 
+# current installed release and not all possible releases
+for arch in `echo $supported_archs`;do {
+  # main <-> pure, free, or OSS
+  # non-free <-> well, duh
+  # contrib <-> depends on non-free (we play safe and use contrib)
+  dest="$repo_name/dists/$deb_release/contrib/binary-$arch"
+  find "$deb_pool" -name "*${arch}*.deb" -type f -exec cp "{}" "$dest"/ \;
+} ; done
+dest="$repo_name/dists/$deb_release/contrib/source"
+find "$deb_pool" -name "*.dsc" -type f -exec cp {} "$dest" \;
+
+echo "Step 3: Build desriptions of the files in their proper places."
+for release in `echo stable testing unstable`;do  {
+  for component in `echo main contrib non-free`;do {
+     cd "$root/$repo_name/dists/$release/$component/"
+     for arch in `echo $supported_archs`;do {
+       if [ 0 -lt `ls binary-$arch | wc -l` ]; then {
+        dpkg-scanpackages binary-$arch /dev/null | gzip -9c > binary-$arch/Packges.gz
+       } ; fi
+     } ; done
+     if [ 0 -lt `ls source | wc -l` ]; then {
+       dpkg-scansources source /dev/null | gzip -9c > source/Sources.gz
+     } ;fi
+     # return home
+     cd "$root"
+  } ; done
+} ; done
+
+echo "Step 4: Build the Release files to Pin the release"
+# having to dupe this file everywhere is, well, stupid
+# this assume the last cd $root returned, as well.
+for release in `echo stable testing unstable`;do  {
+  for component in `echo main contrib non-free`;do {
+   for arch in `echo $supported_archs`;do {
+     dir="$repo_name/dists/$release/$component/binary-$arch"
+cat << EO_RELEASE >> "${dir}/Release"
+Archive: ${release}
+Component: ${component}
+Origin: Waveclaw.net Packaging Team
+Label: Waveclaw.net Debian repository
+Architecture: ${arch}
+EO_RELEASE
+# signing not used at this time
+# md5sum ${dir}/*.deb | sed -e 's+${dir}++g' >> ${dir}/Release
+# gpg --no-default-keyring --secret-keyring ${KEYRING} \
+#        --passphrase "Don't forget to use strong passphrases." \
+#        -a --detach-sign "${dir}/Release"
+# if [ -f Release.gpg ] ; then mv Release.gpg "${dir}/Release.gpg" ;fi
+    } ; done
+    dir="$repo_name/dists/$release/$component/source"
+cat << EO_SRC_RELEASE >> "${dir}/Release"
+Archive: ${release}
+Component: ${component}
+Origin: Waveclaw.net Packaging Team
+Label: Waveclaw.net Debian repository
+Architecture: source
+EO_SRC_RELEASE
+# signing not used at this time
+# md5sum ${dir}/*.deb | sed -e 's+${dir}++g' >> "${dir}/Release"
+# gpg --no-default-keyring --secret-keyring ${KEYRING} \
+#        --passphrase "Don't forget to use strong passphrases." \
+#        -a --detach-sign "${dir}/Release"
+# if [ -f Release.gpg ] ; then mv Release.gpg "${dir}/Release.gpg" ;fi
+  } ; done
+} ; done
+
+echo Step 5: [Optional] Add the repository to /etc/apt/sources.list
+echo deb file:://$root/$repo_name $deb_release main contrib non-free
+echo deb-src file:://$root/$repo_name $deb_release main contrib non-free   
+
+

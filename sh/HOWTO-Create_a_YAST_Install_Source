@@ -1,0 +1,88 @@
+#!/bin/sh
+############################################################################
+# TITLE       : YUM Repo Tool
+# PROJECT     : repositories 
+# ENGINEER    : waveclaw
+# PROGRAM     : repository
+# FILE        : HOWTO-Create_a_YAST_Install_Source
+# CREATED     : 21-DEC-2011 waveclaw
+# DESCRIPTION : Build a YAST Install Source
+# ASSUMPTIONS : Familiarity with bash, yum, zypper, rpm and YAST
+############################################################################
+#                          RELEASE LISCENSE              
+#
+#       This file is available under copyright 2014. 
+#       For internal use only, keep out of young children. 
+#                                                                        
+#       Other Copyrights to their respective owners.                           
+#                                                                        
+#  Current version : 0.1
+#  Latest version  : 0.1
+#  Bugs, Comments  : waveclaw@waveclaw.net
+############################################################################
+#                          RELEVANT DOCUMENTS
+#                           (REFERENCES)
+#
+#  Name                            Comment
+#  ------------------------------- -------------------------------------
+#  Shellfiles in a Nutshell         primary Shell File resource          
+# 
+############################################################################
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+RPMS_HOME="/tmp/packages/"
+OLD_RPMS_LOCATION="${RPMS_HOME}/RPMS"
+NEW_INSTALL_SOURCE="${RPMS_HOME}/suse_yast_install_source"
+CURRENT_DATE=`date +%Y%m%d%H%M%S`
+ARCHS="i586 x86_64 i686 noarch src"
+
+echo '0. prep an RPM link farm'
+find "${OLD_RPMS_LOCATION}" -type l -exec rm -f "{}" \;
+find "${RPMS_HOME}" -name '*.rpm' -type f -exec ln -s "{}" "${OLD_RPMS_LOCATION}" \;
+
+# nothing in the repo should be unique, just links and the EO_ files below 
+rm -rf "${NEW_INSTALL_SOURCE}"
+mkdir -p "${NEW_INSTALL_SOURCE}"
+
+
+echo '1. link all the rpms to their expected locations'
+for DIR in `echo $ARCHS`; do {
+ mkdir -p "${NEW_INSTALL_SOURCE}/RPMS/${DIR}"
+ find ${OLD_RPMS_LOCATION} -maxdepth 1 -name "*${DIR}*rpm" \
+ 	-exec ln -s "{}" "${NEW_INSTALL_SOURCE}/RPMS/${DIR}/" \; 
+}; done
+
+cd ${NEW_INSTALL_SOURCE}
+
+echo '2.  add a content description'
+cat <<EO_CONTENT >> "${NEW_INSTALL_SOURCE}/content"
+PRODUCT example.net 
+VERSION 12.3-4
+LABEL example.net (SUSE LINUX 12.3)
+VENDOR example.net Packager Team
+ARCH.x86_64 x86_64 i686 i586 i486 i386 noarch
+ARCH.i686 i686 i586 i486 i386 noarch
+ARCH.i586 i586 i486 i386 noarch
+DEFAULTBASE x86_64
+DESCRDIR setup/descr
+DATADIR RPMS
+EO_CONTENT
+
+echo '3. add media description'
+mkdir -p "${NEW_INSTALL_SOURCE}/media.1";
+cat <<EO_MEDIA >> "${NEW_INSTALL_SOURCE}/media.1/media"
+example.net
+${CURRENT_DATE}
+1
+EO_MEDIA
+
+echo '4. add the yast b0rked-FTP and rpm-descr helper files'
+cd "${NEW_INSTALL_SOURCE}"
+touch directory.yast
+ls -A1 > directory.yast
+DESC_TOOL=/opt/kde3/share/apps/krpmview/create_package_descr
+if [ -x $DESC_TOOL] 
+$DESC_TOOL -d RPMS/
+
+echo '5. [optional] sign the media files'

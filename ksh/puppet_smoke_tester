@@ -1,0 +1,193 @@
+#!/bin/ksh
+############################################################################
+# TITLE       : Puppet Smoke Tester
+# PROJECT     : puppet
+# ENGINEER    : waveclaw@waveclaw.net
+# PROGRAM     : puppet_smoke_tester
+# FILE        : puppet_smoke_tester
+# CREATED     : 22-DEC-2013
+# DESCRIPTION : KSH script wrapper for nUnit output of puppet smoke testing
+# ASSUMPTIONS : Familiarity with sh, Stash, Puppet and Atlassian Bamboo
+############################################################################
+#                          RELEASE LISCENSE 
+#
+#       This file is available under copyright 2014 
+#       For internal use only, keep out of young children. 
+#       Apply directly to the tester.
+#
+#  Copyrights to their respective owners
+#
+#  Current version : $Ver:0.2$
+#  Latest version  : 0.1
+#  Bugs, Comments  : waveclaw@waveclaw.net
+############################################################################
+#                          RELEVANT DOCUMENTS
+#                           (REFERENCES)
+#
+#  Name                            Comment
+#  ------------------------------- -------------------------------------
+#  Shellfiles in a Nutshell         primary Shell File resource	  	 
+# 
+############################################################################
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+DATE=`date +%FT%T%z`
+DEST='test-reports'
+RESULTS="smoke_test.xml"
+PUPPET='/usr/bin/puppet'
+OPTS="apply --noop --modulepath=$PWD/../"
+TESTS='tests/*'
+NAME=`echo $PWD | awk -F/ '{ print $NF}'`
+
+empty_smoke_test() {
+CAT <EOSUITE
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites errors="0" failures="0" skipped="0" tests="0" time="0.000000001" timestamp="$DATE">
+ <testsuite name="$NAME" tests="0" errors="0" failures="0" skipped="0">
+ </testsuite>
+</testsuites>
+EOSTUIE
+}
+
+print_tests() {
+cat <EOHEADER
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites errors="0" failures="$ERR" skipped="$SKIP" tests="$TOTAL" time="$TTIME" timestamp="$DATE">
+<testsuite name="$NAME" tests="$TOTAL" errors="0" failures="$ERR" skipped="0">
+  <properties/>
+EOHEADER
+
+i=0
+while [ $i -lt $PASS ]
+do
+cat <EOPASS
+   <testcase name="${TPNAME[$i]}" time="${TPTIME[$i]}">
+   </testcase>
+EOPASS
+i=`echo $i + 1 |bc`
+done
+
+i=0
+while [ $i -lt $ERR ]
+do
+CAT <EOERR
+    <testcase name="${TFNAME[$i]}" time="${TFTIME[$i]}">
+      <failure message="Smoke test failed on ${TFNAME[$i]}" type="failed">
+        <![CDATA[${TFOUT[$i]}]]>
+      </failure>
+    </testcase>
+EOERR
+i=`echo $i + 1 |bc`
+done
+
+i=0
+while [ $i -lt $SKIP ]
+do
+CAT <EOSKIPP
+    <testcase name="${SKIPNAME[$i]}" time="0.000000001">
+      <skipped message="Skipped test ${SKIPNAME[$i]}" type="skipped">
+        <![CDATA[${SKIPOUT[$i]}]]>
+      </skipped>
+    </testcase>
+EOSKIPP
+i=`echo $i + 1 |bc`
+done
+
+cat <EOTAIL
+</testsuite>
+</testsuites>
+EOTAIL
+
+}
+
+#find options
+USAGE="Usage: `basename $0` [-o|--output outputfile] [-t|--testfile testfile] [-d|--dest desintation_directory]"
+while [ 0 -lt $# ]
+do
+case "$1" in 
+ -o|--output) shift;
+	RESULTS="$1";
+	shift;
+	;;
+ -t|--testfile) shift;
+  TESTS="$1";
+  shift;
+  ;;
+ -d|--dest) shift;
+  DEST="$1";
+  shift;
+  ;;
+ *) echo $USAGE;
+  exit 1;
+  ;;
+esac
+done 
+
+TESTS=`/bin/ls -d $TESTS`
+if [ " $TESTS" == " " ]
+then
+ echo "No Tests found" >&2
+ mkdir -p $DEST
+ empty_smoke_test > "${DEST}/${RESULTS}"
+ exit 0
+fi
+
+set -a TPNAME 
+set -a TPTIME 
+set -a TFNAME 
+set -a TFTIME
+set -a SKIPNAME
+set -a SKIPOUT
+ERR=0
+PASS=0
+SKIP=0
+
+passing() {
+TPNAME[$PASS]=`echo $T | awk -F/ '{print $NF}'`
+TPTIME[$PASS]=`echo "scale=9;($T2 - $T1)" |bc`
+PASS=`echo $PASS + 1 |bc`
+}
+
+failure() {
+TFNAME[$ERR]=`echo $T | awk -F/ '{print $NF}'`
+TFTIME[$ERR]=`echo "scale=9;($T2 - $T1)" |bc`
+TFOUT[$ERR]=` echo "$OUTPUT" | sed -e "s/\x1b\[.\{1,5\}m//g"`
+ERR=`echo $ERR + 1 |bc`
+}
+
+skipped() {
+SKIPNAME[$SKIP]=`echo $T | awk -F/ '{print $NF}'`
+SKIPOUT[$SKIP]=` echo "$OUTPUT" | sed -e "s/\x1b\[.\{1,5\}m//g"`
+SKIP=`echo $SKIP + 1| bc`
+}
+
+T0=`date +%s.%N`
+for T in $TESTS
+do
+if [ -f $T ]
+then
+T1=`date +%s.%N`
+echo $T1
+OUTPUT=`$PUPPET $OPTS $T 2>&1`
+RES=$?
+T2=`date +%s.%N`
+echo $T2
+ if [ $RES -eq 0 ]
+ then
+   if echo "${OUTPUT}" | egrep -q -i 'skipped'
+       skipped
+    else
+       passing
+   fi
+ else
+   failure
+ fi
+fi
+done
+T3=`date +%s.%N`
+TOTAL=`echo $ERR + $PASS |bc`
+TTIME=`echo "scale=9;($T3 - $T0)" |bc`
+
+mkdir -p $DEST
+print_tests > "${DEST}/${RESULTS}"
