@@ -5,7 +5,7 @@
 # ENGINEER    : waveclaw
 # PROGRAM     : repository
 # FILE        : HOWTO-Create_a_YAST_Install_Source
-# CREATED     : 21-DEC-2011 waveclaw
+# CREATED     : 21-DEC-2011
 # DESCRIPTION : Build a YAST Install Source
 # ASSUMPTIONS : Familiarity with bash, yum, zypper, rpm and YAST
 ############################################################################
@@ -85,4 +85,9 @@ DESC_TOOL=/opt/kde3/share/apps/krpmview/create_package_descr
 if [ -x $DESC_TOOL] 
 $DESC_TOOL -d RPMS/
 
-echo '5. [optional] sign the media files'
+echo "5. [optional] make a yum repo out of the install source"
+if [ -x `which createrepo` ]
+then
+createrepo -d -c /tmp/cr_cache.$0.$$ RPMS/
+rm -rf /tmp/cr_cache.$0.$$
+fi
