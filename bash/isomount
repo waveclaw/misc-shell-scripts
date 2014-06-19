@@ -21,21 +21,93 @@
 #  Bugs, Comments  : waveclaw@waveclaw.net
 ############################################################################
 PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+OLDROOT=/var/www/html/pub/ISOs
+MAXDEV=64
 
-ROOT=/var/www/html/pub
-if [ -d $ROOT/ISOs ]
-then
-  ;
-else
-  echo "No such directory ${ROOT}/ISOs"
+usage() {
+echo "Usage: `basename $0`"
+cat <<EOU
+ -l path    Location of the ISOs [default $OLDROOT]
+ -d count   Number of extra loop devices to make
+ -h         This help text
+EOU
+}
+
+while [ 0 -lt $# ]
+do
+case "$1" in
+ -h)
+   usage
+   exit 0
+   ;;
+ -l)
+  shift
+  ROOT=$1
+  shift
+  ;;
+ -d)
+  shift
+  MAXDEV=$1
+  shift
+  ;;
+ *)
+  echo "Unkown option $1"
+  echo
+  usage
   exit 1
+  ;;
+esac
+done
+
+if [ " $ROOT" == " " ]
+then
+ROOT=$OLDROOT
 fi
 
-echo "Use udev to increase the loop devices to 64"
-for ((i=8;i<64;i++)); do   [ -e /dev/loop$i ] || mknod -m 0600 /dev/loop$i b 7 $i; done
+if [ \! -d "$ROOT" ]
+then
+ echo "${ROOT} not a directory!"
+ echo
+ usage
+ exit 1
+fi
 
-echo "Mounting all ISOs in ${ROOT}/ISOs"
-for DISK in $ROOT/ISOs/*.iso
+echo "Use udev to increase the loop devices to $MAXDEV"
+
+if [ -e /etc/redhat-release ]
+then
+ # on some RHEL variant
+ if egrep '(5.\d)' /etc/redhat-release
+ then
+  # old skool
+  echo "options loop max_loop=$MAXDEV" >> /etc/modprobe.conf
+  modprobe -r loop 
+  modprobe loop 
+ fi
+ if egrep '6.\d' /etc/redhat-release || [ -f /etc/fedora-release ]
+ then
+  # modernized but still weird
+  for i in `seq 7 $MAXDEV`
+  do
+    if [ \! -e /dev/loop$i ]
+    then
+     MAKEDEV -v /dev/loop$i
+    fi
+  done
+ fi
+else
+ # on all other platforms
+ for i in `seq 8 $MAXDEV`
+ do   
+  if [ \! -e /dev/loop$i ] 
+  then
+   mknod -m 0600 /dev/loop$i b 7 $i
+  fi
+ done
+fi
+
+echo "Mounting all ISOs in ${ROOT}"
+for DISK in $ROOT/*.iso
 do 
 ISO=`basename ${DISK%.iso}`
 MNT=$ROOT/repo/$ISO

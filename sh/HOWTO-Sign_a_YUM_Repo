@@ -24,13 +24,70 @@
 PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
 
 TEAM='example.net Packager Team'
-RPMS_HOME="/tmp/packages/"
-OLD_RPMS_LOCATION="${RPMS_HOME}/RPMS"
-NEW_INSTALL_SOURCE="${RPMS_HOME}/suse_yast_install_source"
+RPMS_HOME='/tmp/packages/'
 CURRENT_DATE=`date +%Y%m%d%H%M%S`
-ARCHS="i586 x86_64 i686 noarch src"
+ARCHS='i586 x86_64 i686 noarch src'
 
+usage() {
+echo "Usage: `basename $0`"
+cat <<EOU
+Parameters
+ -s path    Source location of the packages
+ -d path    Destination location for the REPO
+ -t team    Name of the packager team
+ -g key     GPG sign the repo with 'key' from current keyring
+
+Options
+ -h         This help text
+EOU
+}
+
+while [ 0 -lt $# ]
+do
+case "$1" in
+ -h)
+   usage
+   exit 0
+   ;;
+ -s)
+  shift
+  RPMS_HOME=$1
+  shift
+  ;;
+ -d)
+  shift
+  NEW_INSTALL_SOURCES=$1
+  shift
+  ;;
+ -g)
+  shift
+  RING=$1
+  shift
+  ;;
+ -t)
+  shift
+  TEAM=$1
+  shift
+  ;;
+ *)
+  echo "Unkown option $1"
+  echo
+  usage
+  exit 1
+  ;;
+esac
+done
+
+OLD_RPMS_LOCATION="${RPMS_HOME}/RPMS"
+if [ " $NEW_INSTALL_SOURCE" == " " ]
+then
+NEW_INSTALL_SOURCE="${RPMS_HOME}/suse_yast_install_source"
+fi
+# only if signing
+if [ " $RING" == " " ]
+then
 RING=${RPMS_HOME}/gpg/gpg-yum.keyring
+fi
 PUBLIC_KEY=${NEW_INSTALL_SOURCE}/gpg-yum-key.asc
 
 make_key() {

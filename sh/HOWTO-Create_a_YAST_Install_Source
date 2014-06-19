@@ -30,30 +30,64 @@
 ############################################################################
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
-
+ARCHS="i586 x86_64 i686 noarch src"
+CURRENT_DATE=`date +%Y%m%d%H%M%S`
 RPMS_HOME="/tmp/packages/"
 OLD_RPMS_LOCATION="${RPMS_HOME}/RPMS"
 NEW_INSTALL_SOURCE="${RPMS_HOME}/suse_yast_install_source"
-CURRENT_DATE=`date +%Y%m%d%H%M%S`
-ARCHS="i586 x86_64 i686 noarch src"
+
+usage() {
+echo "Usage: `basename $0`"
+cat <<EOUSE
+
+Parameters
+ -d path Location of the repository
+ -s path Location of the .rpm files 
+
+Options
+ -h      This help text
+EOUSE
+}
+
+while [ 0 -lt $# ]
+do
+case "$1" in
+ -h)
+   usage
+   exit 0
+   ;;
+ -s)
+  shift
+  OLD_RMS_LOCATION=$1
+  shift
+  ;;
+ -d)
+  shift
+  NEW_INSTALL_SOURCE=$1
+  shift
+  ;;
+ *)
+  echo "Unkown option $1"
+  echo
+  usage
+  exit 1
+  ;;
+esac
+done
+
 
 echo '0. prep an RPM link farm'
-find "${OLD_RPMS_LOCATION}" -type l -exec rm -f "{}" \;
-find "${RPMS_HOME}" -name '*.rpm' -type f -exec ln -s "{}" "${OLD_RPMS_LOCATION}" \;
-
 # nothing in the repo should be unique, just links and the EO_ files below 
 rm -rf "${NEW_INSTALL_SOURCE}"
 mkdir -p "${NEW_INSTALL_SOURCE}"
 
-
 echo '1. link all the rpms to their expected locations'
 for DIR in `echo $ARCHS`; do {
  mkdir -p "${NEW_INSTALL_SOURCE}/RPMS/${DIR}"
- find ${OLD_RPMS_LOCATION} -maxdepth 1 -name "*${DIR}*rpm" \
+ find ${OLD_RPMS_LOCATION} -name "*${DIR}*rpm" \
  	-exec ln -s "{}" "${NEW_INSTALL_SOURCE}/RPMS/${DIR}/" \; 
 }; done
 
-cd ${NEW_INSTALL_SOURCE}
 
 echo '2.  add a content description'
 cat <<EO_CONTENT >> "${NEW_INSTALL_SOURCE}/content"
@@ -78,16 +112,20 @@ ${CURRENT_DATE}
 EO_MEDIA
 
 echo '4. add the yast b0rked-FTP and rpm-descr helper files'
-cd "${NEW_INSTALL_SOURCE}"
+pushd "${NEW_INSTALL_SOURCE}"
 touch directory.yast
 ls -A1 > directory.yast
 DESC_TOOL=/opt/kde3/share/apps/krpmview/create_package_descr
-if [ -x $DESC_TOOL] 
+if [ -x $DESC_TOOL ] 
+then
 $DESC_TOOL -d RPMS/
+fi
 
 echo "5. [optional] make a yum repo out of the install source"
-if [ -x `which createrepo` ]
+if `which createrepo`
 then
 createrepo -d -c /tmp/cr_cache.$0.$$ RPMS/
 rm -rf /tmp/cr_cache.$0.$$
 fi
+
+popd

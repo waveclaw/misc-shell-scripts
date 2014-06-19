@@ -21,6 +21,7 @@
 #  Bugs, Comments  : waveclaw@waveclaw.net
 ############################################################################
 PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin
+OLDROOT=/var/www/html/pub/ISOs
 
 if [ ! -x `which createrepo` ]
 then
@@ -28,9 +29,47 @@ then
   exit 1
 fi
 
-ROOT=/var/www/html/pub
-echo "assuming disks are already mounted under $ROOT..."
-[ -d $ROOT/ISOs ] || exit 0
+usage() {
+echo "Usage: `basename $0`"
+cat <<EOU
+ -l path    Location of the ISOs [default $OLDROOT]
+ -h         This help text
+EOU
+}
+
+while [ 0 -lt $# ]
+do
+case "$1" in 
+ -h) 
+   usage
+   exit 0
+   ;;
+ -l) 
+  shift
+  ROOT="$1";
+  shift
+  ;;
+ *) 
+  echo "Unkown option $1"
+  echo
+  usage
+  exit 1
+  ;;
+esac
+done
+
+if [ " $ROOT" == " " ]
+then
+ROOT=$OLDROOT
+fi
+
+if [ \! -d "$ROOT" ] 
+then
+ echo "${ROOT} not a directory!"
+ echo
+ usage
+ exit 1
+fi 
 
 rm -rf /tmp/cr_cache.$$ 
 mkdir -p /tmp/cr_cache.$$ 
